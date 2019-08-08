@@ -1,4 +1,4 @@
-from neural_net_evo import Food, Organism
+from neural_net_evo import Food, Organism, Environment
 
 
 # Environment settings
@@ -6,7 +6,12 @@ x_min = -1
 x_max = 1
 y_min = -1
 y_max = 1
-tol = .075
+tolerance = .075
+num_orgs = 50
+num_food = 100
+num_gens = 50
+gen_time = 100
+dt = .04
 
 # Food settings
 food_value = 1
@@ -20,18 +25,25 @@ n_hidden_nodes = 5
 n_output_nodes = 2
 
 
-food = Food(x_min, x_max, y_min, y_max, food_value)
-
-org = Organism(
-	x_min,
-	x_max,
-	y_min,
-	y_max,
-	v_max,
-	dv_max,
-	do_max,
-	n_input_nodes,
-	n_hidden_nodes,
-	n_output_nodes,
-	tol
+env = Environment(
+	x_min=x_min,
+	x_max=x_max,
+	y_min=y_min,
+	y_max=y_max,
+	v_max=v_max,
+	dv_max=dv_max,
+	do_max=do_max,
+	n_input_nodes=n_input_nodes,
+	n_hidden_nodes=n_hidden_nodes,
+	n_output_nodes=n_output_nodes,
+	tolerance=tolerance,
+	num_orgs=num_orgs,
+	num_food=num_food,
+	food_value=1,
+	elitism=.20,
+	num_gens=num_gens,
+	gen_time=gen_time,
+	dt=dt
 	)
+
+env.run()
