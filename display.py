@@ -5,14 +5,15 @@ from neural_net_evo import Food, Organism, Environment
 
 # Environment settings
 x_min = 0.0
-x_max = 8.0
+x_max = 4.0
 y_min = 0.0
-y_max = 8.0
+y_max = 4.0
 tolerance = .075
+elitism = .60
 mutation_rate = 0.10
-num_orgs = 100
-num_food = 200
-num_gens = 50
+num_orgs = 50
+num_food = 100
+num_gens = 9999999999
 gen_time = 100
 dt = 0.04
 colors = [
@@ -49,8 +50,8 @@ env = Environment(
     mutation_rate=mutation_rate,
     num_orgs=num_orgs,
     num_food=num_food,
-    food_value=1,
-    elitism=.20,
+    food_value=food_value,
+    elitism=elitism,
     num_gens=num_gens,
     gen_time=gen_time,
     dt=dt,

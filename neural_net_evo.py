@@ -26,7 +26,7 @@ class Organism(object):
         self.y = np.random.uniform(self.y_min, self.y_max)
         self.o = np.random.uniform(0, 360)
         self.v = np.random.uniform(0, self.v_max)
-        self.dv = np.random.uniform(-self.dv_max, self.dv_max) # NOT NEEDED?
+        self.dv = np.random.uniform(-self.dv_max, self.dv_max)
         self.d_food = 9999
         self.o_food = 0
         self.fitness = 0
@@ -197,42 +197,53 @@ class Environment(object):
             org.update_v(self.dt)
             org.update_pos(self.dt)
 
-    
+
     def evolve(self):
 
-        keep_num = int(np.floor(self.elitism * self.num_orgs))
-        new_num = self.num_orgs - keep_num
+        elite_num = int(np.floor(self.elitism * self.num_orgs))
 
         # Elitism: keep the best performing organisms.
         orgs_sorted = sorted(
             self.organisms, key=lambda x: x.fitness, reverse=True
             )
-        orgs_new = [
-            Organism(
-                x_min=self.x_min,
-                x_max=self.x_max,
-                y_min=self.y_min,
-                y_max=self.y_max,
-                v_max=self.v_max,
-                dv_max=self.dv_max,
-                do_max=self.do_max,
-                n_input_nodes=self.n_input_nodes,
-                n_hidden_nodes=self.n_hidden_nodes,
-                n_output_nodes=self.n_output_nodes,
-                tolerance=self.tolerance,
-                mutation_rate=self.mutation_rate,
-                w_input_hidden=orgs_sorted[i].w_input_hidden,
-                w_hidden_output=orgs_sorted[i].w_hidden_output,
-                color=orgs_sorted[i].color,
-                name=orgs_sorted[i].name
-                ) for i in range(keep_num)
-        ]
+
+        orgs_elite = orgs_sorted[0:elite_num]
+        orgs_new = []
+        # orgs_new = [
+        #     Organism(
+        #         x_min=self.x_min,
+        #         x_max=self.x_max,
+        #         y_min=self.y_min,
+        #         y_max=self.y_max,
+        #         v_max=self.v_max,
+        #         dv_max=self.dv_max,
+        #         do_max=self.do_max,
+        #         n_input_nodes=self.n_input_nodes,
+        #         n_hidden_nodes=self.n_hidden_nodes,
+        #         n_output_nodes=self.n_output_nodes,
+        #         tolerance=self.tolerance,
+        #         mutation_rate=self.mutation_rate,
+        #         w_input_hidden=orgs_sorted[i].w_input_hidden,
+        #         w_hidden_output=orgs_sorted[i].w_hidden_output,
+        #         color=orgs_sorted[i].color,
+        #         name=orgs_sorted[i].name
+        #         ) for i in range(keep_num)
+        # ]
 
         # Generate new organisms.
-        for i in range(new_num):
+        for i in range(self.num_orgs):
 
             # Perform truncation selection.
-            org_1, org_2 = np.random.choice(orgs_sorted, 2)
+            match = False
+            while not match:
+                org_1, org_2 = np.random.choice(orgs_elite, 2)
+                match = (
+                    sqrt(
+                        (org_1.color[0] - org_2.color[0]) ** 2
+                        + (org_1.color[1] - org_2.color[1]) ** 2
+                        + (org_1.color[2] - org_2.color[2]) ** 2
+                        ) <= 400
+                    )
 
             # Perform crossover.
             crossover_weight = np.random.uniform(0, 1)
@@ -294,6 +305,104 @@ class Environment(object):
                     )
                 )
         self.organisms = orgs_new
+
+
+    # def evolve(self):
+
+    #     keep_num = int(np.floor(self.elitism * self.num_orgs))
+    #     new_num = self.num_orgs - keep_num
+
+    #     # Elitism: keep the best performing organisms.
+    #     orgs_sorted = sorted(
+    #         self.organisms, key=lambda x: x.fitness, reverse=True
+    #         )
+    #     orgs_new = [
+    #         Organism(
+    #             x_min=self.x_min,
+    #             x_max=self.x_max,
+    #             y_min=self.y_min,
+    #             y_max=self.y_max,
+    #             v_max=self.v_max,
+    #             dv_max=self.dv_max,
+    #             do_max=self.do_max,
+    #             n_input_nodes=self.n_input_nodes,
+    #             n_hidden_nodes=self.n_hidden_nodes,
+    #             n_output_nodes=self.n_output_nodes,
+    #             tolerance=self.tolerance,
+    #             mutation_rate=self.mutation_rate,
+    #             w_input_hidden=orgs_sorted[i].w_input_hidden,
+    #             w_hidden_output=orgs_sorted[i].w_hidden_output,
+    #             color=orgs_sorted[i].color,
+    #             name=orgs_sorted[i].name
+    #             ) for i in range(keep_num)
+    #     ]
+
+    #     # Generate new organisms.
+    #     for i in range(new_num):
+
+    #         # Perform truncation selection.
+    #         org_1, org_2 = np.random.choice(orgs_sorted, 2)
+
+    #         # Perform crossover.
+    #         crossover_weight = np.random.uniform(0, 1)
+    #         w_input_hidden_new = (
+    #             (crossover_weight * org_1.w_input_hidden)
+    #             + ((1 - crossover_weight) * org_2.w_input_hidden)
+    #         )
+    #         w_hidden_output_new = (
+    #             (crossover_weight * org_1.w_hidden_output)
+    #             + ((1 - crossover_weight) * org_2.w_hidden_output)
+    #         )
+
+    #         # Perform mutation.
+    #         if np.random.uniform(0, 1) <= self.mutation_rate:
+                
+    #             if np.random.randint(0, 1) == 0:
+    #                 # Mutate [input -> hidden] weights.
+    #                 w_row = np.random.randint(0, self.n_hidden_nodes - 1)
+    #                 w_input_hidden_new[w_row] *= np.random.uniform(.9, 1.1)
+    #                 if w_input_hidden_new[w_row] > 1:
+    #                     w_input_hidden_new[w_row] = 1
+    #                 elif w_input_hidden_new[w_row] < -1:
+    #                     w_input_hidden_new[w_row] = -1
+                
+    #             else:
+    #                 # Mutate [hidden -> output] weights.
+    #                 w_row = np.random.randint(0, self.n_output_nodes - 1)
+    #                 w_col = np.random.randint(0, self.n_hidden_nodes - 1)
+    #                 w_hidden_output_new[w_row][w_col] *= np.random.uniform(
+    #                     .9, 1.1
+    #                     )
+    #                 if w_hidden_output_new[w_row][w_col] > 1:
+    #                     w_hidden_output_new[w_row][w_col] = 1
+    #                 if w_hidden_output_new[w_row][w_col] < -1:
+    #                     w_hidden_output_new[w_row][w_col] = - 1
+
+    #         orgs_new.append(
+    #             Organism(
+    #             x_min=self.x_min,
+    #             x_max=self.x_max,
+    #             y_min=self.y_min,
+    #             y_max=self.y_max,
+    #             v_max=self.v_max,
+    #             dv_max=self.dv_max,
+    #             do_max=self.do_max,
+    #             n_input_nodes=self.n_input_nodes,
+    #             n_hidden_nodes=self.n_hidden_nodes,
+    #             n_output_nodes=self.n_output_nodes,
+    #             tolerance=self.tolerance,
+    #             mutation_rate=self.mutation_rate,
+    #             w_input_hidden=w_input_hidden_new,
+    #             w_hidden_output=w_hidden_output_new,
+    #             name=f'gen[{self.generation}]-org[{i + 1}]',
+    #             x_inherited=np.mean([org_1.x, org_2.x]),
+    #             y_inherited=np.mean([org_1.y, org_2.y]),
+    #             color=[
+    #             round(e) for e in np.mean([org_1.color, org_2.color], axis=0)
+    #             ]
+    #                 )
+    #             )
+    #     self.organisms = orgs_new
 
 
     def _calc_heading(self, org, food):
