@@ -1,4 +1,7 @@
+from datetime import datetime
 import numpy as np
+from tqdm import tqdm
+from math import radians, degrees, sqrt, atan2
 
 
 class Food(object):
@@ -27,6 +30,12 @@ class Organism(object):
         self.d_food = 9999
         self.o_food = 0
         self.fitness = 0
+        
+        # Create offspring between its two parents.
+        if 'x_inherited' in self.__dict__.keys():
+            self.x = self.x_inherited
+        if 'y_inherited' in self.__dict__.keys():
+            self.y = self.y_inherited
 
         # If weights are passed then use those, otherwise generate randomly.
         if self.w_input_hidden is None:
@@ -68,8 +77,8 @@ class Organism(object):
             self.v = self.v_max
 
     def update_pos(self, dt):
-        dx = self.v * np.cos(np.radians(self.o)) * dt
-        dy = self.v * np.sin(np.radians(self.o)) * dt
+        dx = self.v * np.cos(radians(self.o)) * dt
+        dy = self.v * np.sin(radians(self.o)) * dt
         self.x += dx
         self.y += dy
 
@@ -87,7 +96,7 @@ class Environment(object):
         Food(self.x_min, self.x_max, self.y_min, self.y_max, self.food_value)
         for i in range(self.num_food)
         ]
-
+        
         self.organisms = [
             Organism(
                 x_min=self.x_min,
@@ -101,29 +110,59 @@ class Environment(object):
                 n_hidden_nodes=self.n_hidden_nodes,
                 n_output_nodes=self.n_output_nodes,
                 tolerance=self.tolerance,
+                mutation_rate=self.mutation_rate,
                 w_input_hidden=None,
                 w_hidden_output=None,
+                color=self.colors[np.random.randint(0, len(self.colors))],
                 name=f'gen[{self.generation}]-org[{i + 1}]'
                 ) for i in range(self.num_orgs)
         ]
 
 
     def run(self):
+        
         total_time_steps = int(self.gen_time / self.dt)
+        
         for gen in range(self.num_gens):
-            print(f'Simulating generation {gen}')        
-            for step in range(total_time_steps):
+            print(f'Simulating...')
+            for step in tqdm(range(total_time_steps)):
+                yield {
+                'foods': [(food.x, food.y) for food in self.foods],
+                'orgs': [
+                (org.x, org.y, org.fitness, org.color)
+                for org in self.organisms
+                ]
+                }
                 self.tick()
-            self.evolve()
+            fitnesses = sorted([org.fitness for org in self.organisms])
+            best = fitnesses[-1]
+            worst = fitnesses[0]
+            average = np.mean(fitnesses)
+            
+            print(
+                f'\nGEN {gen + 1} | \
+                Best: {best} Average: {average} Worst: {worst}'
+                )
 
+            self.evolve()
 
 
     def tick(self):
 
-        # Update fitness.
+        # Build distances matrices.
+        self.matrices = []
         for food in self.foods:
-            for org in self.organisms:
-                food_org_dist = self._dist(org.x, org.y, food.x, food.y)
+            fa = np.array([food.x, food.y])
+            oa = np.array([(org.x, org.y) for org in self.organisms])
+            distances = (fa - oa) ** 2
+            distances = np.sum(distances, axis=1)
+            distances = np.sqrt(distances)
+            self.matrices.append(distances)
+
+        # Update fitness.
+        for i, food in enumerate(self.foods):
+            for j, org in enumerate(self.organisms):
+                food_org_dist = self.matrices[i][j]
                 if food_org_dist <= self.tolerance:
                     org.fitness += food.value
                     food.respawn(
@@ -137,9 +176,11 @@ class Environment(object):
                 org.o_food = 0
         
         # Calculate heading to nearest food.
-        for food in self.foods:
-            for org in self.organisms:
-                food_org_dist = self._dist(org.x, org.y, food.x, food.y)
+        for i, food in enumerate(self.foods):
+            for j, org in enumerate(self.organisms):
+                food_org_dist = self.matrices[i][j]
+                # food_org_dist = self._dist(org.x, org.y, food.x, food.y)
+                # food_org_dist = sqrt((food.x - org.x)**2 + (food.y - org.y)**2)
                 
                 # Determine if this is the closest food.
                 if food_org_dist < org.d_food:
@@ -162,8 +203,6 @@ class Environment(object):
         keep_num = int(np.floor(self.elitism * self.num_orgs))
         new_num = self.num_orgs - keep_num
 
-        # TODO: ADD STATISTICS REPORTING
-
         # Elitism: keep the best performing organisms.
         orgs_sorted = sorted(
             self.organisms, key=lambda x: x.fitness, reverse=True
@@ -181,8 +220,10 @@ class Environment(object):
                 n_hidden_nodes=self.n_hidden_nodes,
                 n_output_nodes=self.n_output_nodes,
                 tolerance=self.tolerance,
+                mutation_rate=self.mutation_rate,
                 w_input_hidden=orgs_sorted[i].w_input_hidden,
                 w_hidden_output=orgs_sorted[i].w_hidden_output,
+                color=orgs_sorted[i].color,
                 name=orgs_sorted[i].name
                 ) for i in range(keep_num)
         ]
@@ -204,19 +245,61 @@ class Environment(object):
                 + ((1 - crossover_weight) * org_2.w_hidden_output)
             )
 
-            
+            # Perform mutation.
+            if np.random.uniform(0, 1) <= self.mutation_rate:
+                
+                if np.random.randint(0, 1) == 0:
+                    # Mutate [input -> hidden] weights.
+                    w_row = np.random.randint(0, self.n_hidden_nodes - 1)
+                    w_input_hidden_new[w_row] *= np.random.uniform(.9, 1.1)
+                    if w_input_hidden_new[w_row] > 1:
+                        w_input_hidden_new[w_row] = 1
+                    elif w_input_hidden_new[w_row] < -1:
+                        w_input_hidden_new[w_row] = -1
+                
+                else:
+                    # Mutate [hidden -> output] weights.
+                    w_row = np.random.randint(0, self.n_output_nodes - 1)
+                    w_col = np.random.randint(0, self.n_hidden_nodes - 1)
+                    w_hidden_output_new[w_row][w_col] *= np.random.uniform(
+                        .9, 1.1
+                        )
+                    if w_hidden_output_new[w_row][w_col] > 1:
+                        w_hidden_output_new[w_row][w_col] = 1
+                    if w_hidden_output_new[w_row][w_col] < -1:
+                        w_hidden_output_new[w_row][w_col] = - 1
 
-
-
-
-    def _dist(self, x1, y1, x2, y2):
-        return np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            orgs_new.append(
+                Organism(
+                x_min=self.x_min,
+                x_max=self.x_max,
+                y_min=self.y_min,
+                y_max=self.y_max,
+                v_max=self.v_max,
+                dv_max=self.dv_max,
+                do_max=self.do_max,
+                n_input_nodes=self.n_input_nodes,
+                n_hidden_nodes=self.n_hidden_nodes,
+                n_output_nodes=self.n_output_nodes,
+                tolerance=self.tolerance,
+                mutation_rate=self.mutation_rate,
+                w_input_hidden=w_input_hidden_new,
+                w_hidden_output=w_hidden_output_new,
+                name=f'gen[{self.generation}]-org[{i + 1}]',
+                x_inherited=np.mean([org_1.x, org_2.x]),
+                y_inherited=np.mean([org_1.y, org_2.y]),
+                color=[
+                round(e) for e in np.mean([org_1.color, org_2.color], axis=0)
+                ]
+                    )
+                )
+        self.organisms = orgs_new
 
 
     def _calc_heading(self, org, food):
         d_x = food.x - org.x
         d_y = food.y - org.y
-        theta_d = np.degrees(np.arctan2(d_y, d_x)) - org.o
+        theta_d = degrees(atan2(d_y, d_x)) - org.o
         if abs(theta_d) > 180: theta_d += 360
         return theta_d / 180
 
